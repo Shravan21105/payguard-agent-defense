@@ -12,3 +12,4 @@ async def health_check():
         "application": settings.APP_NAME,
         "version": settings.APP_VERSION,
     }
+

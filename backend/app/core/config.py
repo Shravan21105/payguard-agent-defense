@@ -1,5 +1,5 @@
 import os
-from typing import List, Union
+from typing import List, Optional, Union
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
     APP_NAME: str = "PAYGUARD"
-    APP_VERSION: str = "0.1.0"
+    APP_VERSION: str = "0.2.0"
 
     HOST: str = "127.0.0.1"
     PORT: int = 8000
@@ -35,6 +35,24 @@ class Settings(BaseSettings):
             return [i.strip() for i in v.split(",") if i.strip()]
         return v
 
+    # Database
+    DATABASE_PATH: str = "backend/payguard.db"
+
+    # LLM Gateway Configuration
+    LLM_PROVIDER: str = "mock"  # mock, openai, anthropic, gemini, groq, ollama
+    LLM_MODEL: str = "gpt-4o-mini"
+    LLM_API_KEY: Optional[str] = None
+    LLM_API_BASE: Optional[str] = None
+    LLM_TIMEOUT_SECONDS: float = 10.0
+    LLM_TEMPERATURE: float = 0.0
+
+    # Multi-Agent Flags
+    ENABLE_MULTI_AGENT: bool = True
+    INTENT_AGENT_ENABLED: bool = True
+    BEHAVIOURAL_AGENT_ENABLED: bool = True
+    SECURITY_INTEL_AGENT_ENABLED: bool = True
+    AUDIT_AGENT_ENABLED: bool = True
+
     # Policy Defaults
     DEFAULT_MAX_TX_AMOUNT: float = 50.0
     DEFAULT_DAILY_LIMIT: float = 200.0
@@ -42,10 +60,13 @@ class Settings(BaseSettings):
     DEFAULT_MEDIUM_RISK_THRESHOLD: int = 30
     DUPLICATE_WINDOW_SECONDS: int = 120
 
-    # Blockchain (Prepared for future phases - Testnet)
+    # Blockchain & Cryptographic Signer Configuration
     NEAR_NETWORK: str = "testnet"
     NEAR_NODE_URL: str = "https://rpc.testnet.near.org"
     NEAR_CONTRACT_ID: str = "payguard-vault.testnet"
+    POLICY_SIGNER_PRIVATE_KEY: Optional[str] = None
+    POLICY_SIGNER_PUBLIC_KEY: Optional[str] = None
+    ALLOW_EPHEMERAL_SIGNER_KEY: bool = True
 
     model_config = SettingsConfigDict(
         env_file=".env",

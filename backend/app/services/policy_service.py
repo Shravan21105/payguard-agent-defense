@@ -1,15 +1,27 @@
 from datetime import datetime
 from typing import Optional
+from app.db.database import db
 from app.schemas.policy import PolicyConfig, PolicyResponse, PolicyUpdateRequest
 
 
 class PolicyService:
-    """Manages active security policy state."""
+    """Manages active security policy state with SQLite persistence."""
 
     def __init__(self, initial_policy: Optional[PolicyConfig] = None):
         self._policy = initial_policy or PolicyConfig()
         self._updated_at = datetime.utcnow()
         self._version = "1.0.0"
+        self._load_from_db()
+
+    def _load_from_db(self) -> None:
+        try:
+            persisted = db.get_policy()
+            if persisted:
+                self._version = persisted["version"]
+                self._updated_at = datetime.fromisoformat(persisted["updated_at"])
+                self._policy = PolicyConfig(**persisted["config"])
+        except Exception:
+            pass
 
     def get_policy(self) -> PolicyConfig:
         return self._policy
@@ -36,6 +48,9 @@ class PolicyService:
             self._version = ".".join(parts)
         except Exception:
             self._version = "1.0.1"
+
+        # Persist to database
+        db.save_policy(self._version, self._policy.model_dump())
 
         return self.get_policy_response()
 

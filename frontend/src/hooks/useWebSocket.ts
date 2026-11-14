@@ -1,55 +1,33 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { payguardWs, type WebSocketStatus } from '../services/websocket';
+import type { PayguardEvent } from '../types';
 
-export function useWebSocket(url = 'ws://127.0.0.1:8000/ws/events') {
-  const [isConnected, setIsConnected] = useState(false);
-  const [lastMessage, setLastMessage] = useState<any>(null);
-  const wsRef = useRef<WebSocket | null>(null);
+export function useWebSocket(categories: string[] | string = 'all') {
+  const [connectionState, setConnectionState] = useState<WebSocketStatus>(payguardWs.getStatus());
+  const [lastMessage, setLastMessage] = useState<PayguardEvent | null>(null);
 
   useEffect(() => {
-    let reconnectTimeout: any;
+    // Connect to centralized WebSocket service
+    payguardWs.connect();
 
-    const connect = () => {
-      try {
-        const ws = new WebSocket(url);
-        wsRef.current = ws;
+    const unsubscribeStatus = payguardWs.onStatusChange((status) => {
+      setConnectionState(status);
+    });
 
-        ws.onopen = () => {
-          setIsConnected(true);
-        };
-
-        ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            setLastMessage(data);
-          } catch (e) {
-            // plain text message (e.g. pong)
-          }
-        };
-
-        ws.onclose = () => {
-          setIsConnected(false);
-          // Try reconnect after 3 seconds
-          reconnectTimeout = setTimeout(connect, 3000);
-        };
-
-        ws.onerror = () => {
-          ws.close();
-        };
-      } catch (err) {
-        setIsConnected(false);
-        reconnectTimeout = setTimeout(connect, 3000);
-      }
-    };
-
-    connect();
+    const unsubscribeEvents = payguardWs.subscribe(categories, (event) => {
+      setLastMessage(event);
+    });
 
     return () => {
-      clearTimeout(reconnectTimeout);
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
+      unsubscribeStatus();
+      unsubscribeEvents();
     };
-  }, [url]);
+  }, [JSON.stringify(categories)]);
 
-  return { isConnected, lastMessage };
+  return {
+    isConnected: connectionState === 'CONNECTED',
+    connectionState,
+    lastMessage,
+    subscribe: payguardWs.subscribe.bind(payguardWs),
+  };
 }

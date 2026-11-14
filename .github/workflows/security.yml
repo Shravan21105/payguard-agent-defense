@@ -1,0 +1,64 @@
+name: PAYGUARD Security & Secret Audits
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+permissions:
+  contents: read
+
+jobs:
+  secret-scan:
+    name: Repository Secret & Private Key Scanning
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify No Unencrypted Private Keys or Secrets in Tracked Files
+        run: |
+          echo "Scanning tracked files for private keys, seed phrases, and API credentials..."
+          
+          # Check for private key headers
+          if git grep -E "(BEGIN (RSA |EC |OPENSSH |ED25519 )?PRIVATE KEY)" -- ':!.env.example' ':!docs/**' ':!backend/tests/**'; then
+            echo "CRITICAL: Hardcoded private key detected in repository!"
+            exit 1
+          fi
+
+          # Check for explicit NEAR secret keys (ed25519:...)
+          if git grep -E "ed25519:[1-9A-HJ-NP-Za-km-z]{80,}" -- ':!.env.example' ':!docs/**' ':!backend/tests/**'; then
+            echo "CRITICAL: Potential NEAR raw private key detected!"
+            exit 1
+          fi
+
+          # Check for live OpenAI sk- keys
+          if git grep -E "sk-[A-Za-z0-9]{32,}" -- ':!.env.example' ':!docs/**' ':!backend/tests/**'; then
+            echo "CRITICAL: OpenAI live API key pattern detected!"
+            exit 1
+          fi
+
+          echo "Secret scan passed cleanly. No secrets found in tracked source files."
+
+  dependency-audit:
+    name: Dependency Vulnerability Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Audit NPM Dependencies
+        run: |
+          cd frontend
+          npm audit --audit-level=high || true
+

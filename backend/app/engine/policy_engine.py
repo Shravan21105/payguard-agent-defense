@@ -94,6 +94,10 @@ class PolicyEngine:
         if self.policy.enable_duplicate_detection and validation.is_valid:
             window_cutoff = now - timedelta(seconds=self.policy.duplicate_window_seconds)
             for prev in recent_history:
+                # Do not check against the current transaction itself
+                if prev.get("transaction_id") and tx.transaction_id and prev.get("transaction_id") == tx.transaction_id:
+                    continue
+
                 prev_time = prev.get("timestamp")
                 if isinstance(prev_time, str):
                     try:
@@ -127,6 +131,7 @@ class PolicyEngine:
         recent_txs_last_min = [
             t for t in recent_history
             if t.get("sender", "").lower() == sender
+            and not (t.get("transaction_id") and tx.transaction_id and t.get("transaction_id") == tx.transaction_id)
             and (
                 t.get("timestamp") >= minute_cutoff
                 if isinstance(t.get("timestamp"), datetime)
@@ -169,17 +174,34 @@ class PolicyEngine:
         # C. Daily Spending Limit (Rolling 24h)
         # -------------------------------------------------------------
         day_cutoff = now - timedelta(days=1)
-        rolling_daily_volume = sum(
-            float(t.get("amount", 0.0))
-            for t in recent_history
-            if t.get("sender", "").lower() == sender
-            and (
-                t.get("timestamp") >= day_cutoff
-                if isinstance(t.get("timestamp"), datetime)
-                else True
-            )
-            and t.get("decision") in ("ALLOW", "PENDING_EXECUTION", "APPROVED")
-        )
+        rolling_daily_volume = 0.0
+        for t in recent_history:
+            if t.get("transaction_id") and tx.transaction_id and t.get("transaction_id") == tx.transaction_id:
+                continue
+            if t.get("sender", "").lower() != sender:
+                continue
+
+            t_time = t.get("timestamp")
+            if isinstance(t_time, str):
+                try:
+                    t_time = datetime.fromisoformat(t_time.replace("Z", "+00:00"))
+                except Exception:
+                    t_time = None
+            if t_time and t_time < day_cutoff:
+                continue
+
+            t_dec = (t.get("decision") or "").upper()
+            t_stat = (t.get("status") or "").upper()
+
+            # Exclude blocked, failed, and rejected transactions
+            if t_dec == "BLOCK" or t_stat in ("BLOCKED", "FAILED", "REJECTED"):
+                continue
+
+            if (
+                t_dec in ("ALLOW", "PENDING_EXECUTION", "APPROVED", "WARN", "PENDING")
+                or t_stat in ("RECEIVED", "ANALYZING", "EXECUTING", "CONFIRMED", "WARN_PENDING_APPROVAL", "ESCROW_CREATED")
+            ):
+                rolling_daily_volume += float(t.get("amount", 0.0))
 
         projected_daily = rolling_daily_volume + amount
         if projected_daily > self.policy.daily_spending_limit:
@@ -207,3 +229,4 @@ class PolicyEngine:
             rolling_daily_volume=rolling_daily_volume,
             tx_count_last_minute=tx_count_last_minute,
         )
+

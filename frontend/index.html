@@ -1,15 +1,26 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PAYGUARD — Intelligent Security Infrastructure for Autonomous AI Agents</title>
+    <title>PAYGUARD — Agent Defense Layer | Autonomous Transaction Security</title>
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem('payguard-theme');
+          var theme = saved === 'light' ? 'light' : 'dark';
+          document.documentElement.classList.add(theme);
+        } catch (e) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   </head>
-  <body class="bg-charcoal-950 text-charcoal-200 antialiased selection:bg-emerald-500/20 selection:text-emerald-300">
+  <body class="bg-slate-50 text-slate-800 dark:bg-navy-950 dark:text-navy-200 antialiased selection:bg-cyber-indigo selection:text-white transition-colors duration-200">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

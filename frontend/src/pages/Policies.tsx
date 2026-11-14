@@ -1,32 +1,47 @@
 import React, { useEffect, useState } from 'react';
-import { Sliders, Save, Plus, Trash2, CheckCircle2, AlertTriangle, Shield } from 'lucide-react';
+import {
+  Sliders,
+  Shield,
+  AlertTriangle,
+  Users,
+  CheckCircle2,
+  Trash2,
+  Plus,
+  Save,
+} from 'lucide-react';
 import { apiService } from '../services/api';
 import type { PolicyConfig } from '../types';
+import {
+  SectionHeader,
+  GlassCard,
+  GradientButton,
+  StatusBadge,
+  PageTransition,
+} from '../components/ui';
 
 export const Policies: React.FC = () => {
   const [config, setConfig] = useState<PolicyConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-
-  // New list item inputs
-  const [newTrusted, setNewTrusted] = useState('');
   const [newBlocked, setNewBlocked] = useState('');
-
-  useEffect(() => {
-    fetchPolicies();
-  }, []);
+  const [newTrusted, setNewTrusted] = useState('');
 
   const fetchPolicies = async () => {
+    setLoading(true);
     try {
-      const res = await apiService.getPolicies();
-      setConfig(res.config);
-    } catch (e) {
-      console.error(e);
+      const data = await apiService.getPolicies();
+      setConfig(data.config || (data as any).active_policy);
+    } catch (err) {
+      console.error('Failed to load policies:', err);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchPolicies();
+  }, []);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,46 +50,25 @@ export const Policies: React.FC = () => {
     setSaveSuccess(false);
     try {
       const res = await apiService.updatePolicies(config);
-      setConfig(res.config);
+      setConfig(res.config || (res as any).active_policy);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
-    } catch (e: any) {
-      alert(`Failed to save policies: ${e.response?.data?.message || e.message}`);
+    } catch (err) {
+      console.error('Failed to update policies:', err);
     } finally {
       setSaving(false);
     }
   };
 
-  const addTrusted = () => {
-    if (!config || !newTrusted.trim()) return;
-    const clean = newTrusted.trim().toLowerCase();
-    if (!config.trusted_recipients.includes(clean)) {
-      setConfig({
-        ...config,
-        trusted_recipients: [...config.trusted_recipients, clean],
-      });
-      setNewTrusted('');
-    }
-  };
-
-  const removeTrusted = (addr: string) => {
-    if (!config) return;
-    setConfig({
-      ...config,
-      trusted_recipients: config.trusted_recipients.filter((a) => a !== addr),
-    });
-  };
-
   const addBlocked = () => {
-    if (!config || !newBlocked.trim()) return;
-    const clean = newBlocked.trim().toLowerCase();
-    if (!config.blocked_recipients.includes(clean)) {
+    if (!newBlocked.trim() || !config) return;
+    if (!config.blocked_recipients.includes(newBlocked.trim())) {
       setConfig({
         ...config,
-        blocked_recipients: [...config.blocked_recipients, clean],
+        blocked_recipients: [...config.blocked_recipients, newBlocked.trim()],
       });
-      setNewBlocked('');
     }
+    setNewBlocked('');
   };
 
   const removeBlocked = (addr: string) => {
@@ -85,55 +79,59 @@ export const Policies: React.FC = () => {
     });
   };
 
+  const addTrusted = () => {
+    if (!newTrusted.trim() || !config) return;
+    if (!config.trusted_recipients.includes(newTrusted.trim())) {
+      setConfig({
+        ...config,
+        trusted_recipients: [...config.trusted_recipients, newTrusted.trim()],
+      });
+    }
+    setNewTrusted('');
+  };
+
+  const removeTrusted = (addr: string) => {
+    if (!config) return;
+    setConfig({
+      ...config,
+      trusted_recipients: config.trusted_recipients.filter((a) => a !== addr),
+    });
+  };
+
   if (loading || !config) {
     return (
-      <div className="py-24 text-center font-mono text-xs text-charcoal-400">
+      <div className="py-24 text-center font-mono text-xs text-slate-500 dark:text-navy-400">
         Loading active security policy parameters...
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+    <PageTransition className="space-y-6 max-w-7xl mx-auto pb-16">
       {/* Title */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-            <Sliders className="w-6 h-6 text-emerald-400" />
-            <span>Deterministic Policy Configuration</span>
-          </h1>
-          <p className="text-sm text-charcoal-400 mt-1">
-            Configure hard financial guardrails, spending ceilings, and counterparty classifications.
-          </p>
-        </div>
-
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-mono text-xs font-semibold tracking-wider transition shadow-shield-glow w-fit"
-        >
-          {saving ? (
-            <span>SAVING...</span>
-          ) : saveSuccess ? (
-            <>
-              <CheckCircle2 className="w-4 h-4 text-white" />
-              <span>POLICIES UPDATED!</span>
-            </>
-          ) : (
-            <>
-              <Save className="w-4 h-4 text-white" />
-              <span>APPLY POLICY UPDATES</span>
-            </>
-          )}
-        </button>
-      </div>
+      <SectionHeader
+        icon={<Sliders className="w-5 h-5 text-cyber-indigo" />}
+        title="Deterministic Policy Configuration"
+        description="Configure hard financial guardrails, cumulative spending limits, frequency thresholds, and trusted/blocked counterparty registries."
+        action={
+          <GradientButton
+            variant="primary"
+            size="sm"
+            onClick={handleSave}
+            isLoading={saving}
+            leftIcon={saveSuccess ? <CheckCircle2 className="w-4 h-4 text-white" /> : <Save className="w-4 h-4 text-white" />}
+          >
+            {saveSuccess ? 'POLICIES UPDATED!' : 'APPLY POLICY UPDATES'}
+          </GradientButton>
+        }
+      />
 
       <form onSubmit={handleSave} className="space-y-6">
         {/* Core Spending Limits */}
-        <div className="payguard-panel p-6">
-          <div className="flex items-center gap-2 border-b border-charcoal-800 pb-3 mb-6">
-            <Shield className="w-4 h-4 text-emerald-400" />
-            <h2 className="text-sm font-bold uppercase tracking-wider font-mono text-white">
+        <GlassCard className="p-6" variant="elevated">
+          <div className="flex items-center gap-2 border-b border-slate-200/80 dark:border-white/[0.08] pb-3 mb-6">
+            <Shield className="w-4 h-4 text-cyber-cyan" />
+            <h2 className="text-sm font-bold uppercase tracking-wider font-mono text-slate-900 dark:text-white">
               Spending Ceilings &amp; Velocity Limits
             </h2>
           </div>
@@ -141,7 +139,7 @@ export const Policies: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Max Per-TX Limit */}
             <div className="space-y-2">
-              <label className="text-xs font-mono text-charcoal-400 block">
+              <label className="text-xs font-mono text-slate-500 dark:text-navy-400 block font-medium">
                 MAX PER-TRANSACTION (NEAR)
               </label>
               <div className="flex items-center gap-3">
@@ -154,17 +152,17 @@ export const Policies: React.FC = () => {
                   onChange={(e) =>
                     setConfig({ ...config, max_tx_amount: parseFloat(e.target.value) || 0 })
                   }
-                  className="w-full bg-charcoal-950 border border-charcoal-750 rounded-lg px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-white dark:bg-navy-900 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-sm font-mono text-slate-900 dark:text-white focus:outline-none focus:border-cyber-indigo focus:ring-1 focus:ring-cyber-indigo"
                 />
               </div>
-              <p className="text-[11px] text-charcoal-400">
+              <p className="text-[11px] text-slate-500 dark:text-navy-400 font-sans">
                 Single transfers exceeding this limit trigger an immediate hard BLOCK.
               </p>
             </div>
 
             {/* Daily Cumulative Limit */}
             <div className="space-y-2">
-              <label className="text-xs font-mono text-charcoal-400 block">
+              <label className="text-xs font-mono text-slate-500 dark:text-navy-400 block font-medium">
                 DAILY ROLLING LIMIT (NEAR)
               </label>
               <div className="flex items-center gap-3">
@@ -177,17 +175,17 @@ export const Policies: React.FC = () => {
                   onChange={(e) =>
                     setConfig({ ...config, daily_spending_limit: parseFloat(e.target.value) || 0 })
                   }
-                  className="w-full bg-charcoal-950 border border-charcoal-750 rounded-lg px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-white dark:bg-navy-900 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-sm font-mono text-slate-900 dark:text-white focus:outline-none focus:border-cyber-indigo focus:ring-1 focus:ring-cyber-indigo"
                 />
               </div>
-              <p className="text-[11px] text-charcoal-400">
-                Cumulative 24-hour ceiling per agent sender.
+              <p className="text-[11px] text-slate-500 dark:text-navy-400 font-sans">
+                Cumulative 24-hour ceiling per agent sender with atomic TOCTOU protection.
               </p>
             </div>
 
             {/* Max Frequency / Min */}
             <div className="space-y-2">
-              <label className="text-xs font-mono text-charcoal-400 block">
+              <label className="text-xs font-mono text-slate-500 dark:text-navy-400 block font-medium">
                 MAX FREQUENCY (TX / MIN)
               </label>
               <div className="flex items-center gap-3">
@@ -203,30 +201,30 @@ export const Policies: React.FC = () => {
                       max_tx_frequency_per_minute: parseInt(e.target.value) || 1,
                     })
                   }
-                  className="w-full bg-charcoal-950 border border-charcoal-750 rounded-lg px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-white dark:bg-navy-900 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-sm font-mono text-slate-900 dark:text-white focus:outline-none focus:border-cyber-indigo focus:ring-1 focus:ring-cyber-indigo"
                 />
               </div>
-              <p className="text-[11px] text-charcoal-400">
-                Rate-limiting to thwart autonomous loop flooding attacks.
+              <p className="text-[11px] text-slate-500 dark:text-navy-400 font-sans">
+                Prevents rapid loop exploits and autonomous high-frequency transaction drain.
               </p>
             </div>
           </div>
-        </div>
+        </GlassCard>
 
-        {/* Risk Thresholds & Toggles */}
-        <div className="payguard-panel p-6">
-          <div className="flex items-center gap-2 border-b border-charcoal-800 pb-3 mb-6">
-            <Sliders className="w-4 h-4 text-emerald-400" />
-            <h2 className="text-sm font-bold uppercase tracking-wider font-mono text-white">
-              Risk Score Decision Thresholds
+        {/* Risk Thresholds & Heuristics */}
+        <GlassCard className="p-6" variant="elevated">
+          <div className="flex items-center gap-2 border-b border-slate-200/80 dark:border-white/[0.08] pb-3 mb-6">
+            <AlertTriangle className="w-4 h-4 text-amber-400" />
+            <h2 className="text-sm font-bold uppercase tracking-wider font-mono text-slate-900 dark:text-white">
+              Dynamic Risk Scoring Thresholds
             </h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-3">
               <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-amber-400 font-semibold">Medium Risk Threshold (WARN)</span>
-                <span className="text-white font-bold">{config.medium_risk_threshold} / 100</span>
+                <span className="text-amber-500 dark:text-amber-400 font-semibold">Medium Risk Threshold (WARN)</span>
+                <span className="text-slate-900 dark:text-white font-bold">{config.medium_risk_threshold} / 100</span>
               </div>
               <input
                 type="range"
@@ -238,15 +236,15 @@ export const Policies: React.FC = () => {
                 }
                 className="w-full accent-amber-500 cursor-pointer"
               />
-              <p className="text-[11px] text-charcoal-400">
-                Scores at or above this threshold require human operator sign-off before execution.
+              <p className="text-[11px] text-slate-500 dark:text-navy-400 font-sans">
+                Scores at or above this threshold require human operator sign-off and vault escrow before execution.
               </p>
             </div>
 
             <div className="space-y-3">
               <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-rose-400 font-semibold">High Risk Threshold (HARD BLOCK)</span>
-                <span className="text-white font-bold">{config.high_risk_threshold} / 100</span>
+                <span className="text-rose-500 dark:text-rose-400 font-semibold">High Risk Threshold (HARD BLOCK)</span>
+                <span className="text-slate-900 dark:text-white font-bold">{config.high_risk_threshold} / 100</span>
               </div>
               <input
                 type="range"
@@ -258,75 +256,74 @@ export const Policies: React.FC = () => {
                 }
                 className="w-full accent-rose-500 cursor-pointer"
               />
-              <p className="text-[11px] text-charcoal-400">
+              <p className="text-[11px] text-slate-500 dark:text-navy-400 font-sans">
                 Scores at or above this threshold trigger an irrevocable automated BLOCK.
               </p>
             </div>
           </div>
 
-          <div className="mt-6 pt-6 border-t border-charcoal-800 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <label className="flex items-center gap-3 p-3 rounded-lg bg-charcoal-900 border border-charcoal-800 cursor-pointer hover:border-charcoal-700 transition">
+          {/* Toggle Switches */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-6 mt-6 border-t border-slate-200/80 dark:border-white/[0.08]">
+            <label className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-navy-850 border border-slate-200 dark:border-white/[0.06] cursor-pointer hover:border-slate-300 dark:hover:border-white/20 transition">
               <input
                 type="checkbox"
                 checked={config.require_approval_for_unknown}
                 onChange={(e) =>
                   setConfig({ ...config, require_approval_for_unknown: e.target.checked })
                 }
-                className="rounded accent-emerald-500 h-4 w-4"
+                className="rounded accent-cyber-cyan h-4 w-4"
               />
-              <span className="text-xs font-mono text-charcoal-300">
+              <span className="text-xs font-mono text-slate-700 dark:text-navy-200">
                 Require approval for unknown recipients
               </span>
             </label>
 
-            <label className="flex items-center gap-3 p-3 rounded-lg bg-charcoal-900 border border-charcoal-800 cursor-pointer hover:border-charcoal-700 transition">
+            <label className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-navy-850 border border-slate-200 dark:border-white/[0.06] cursor-pointer hover:border-slate-300 dark:hover:border-white/20 transition">
               <input
                 type="checkbox"
                 checked={config.enable_duplicate_detection}
                 onChange={(e) =>
                   setConfig({ ...config, enable_duplicate_detection: e.target.checked })
                 }
-                className="rounded accent-emerald-500 h-4 w-4"
+                className="rounded accent-cyber-cyan h-4 w-4"
               />
-              <span className="text-xs font-mono text-charcoal-300">
+              <span className="text-xs font-mono text-slate-700 dark:text-navy-200">
                 Enable duplicate transaction detection (120s)
               </span>
             </label>
 
-            <label className="flex items-center gap-3 p-3 rounded-lg bg-charcoal-900 border border-charcoal-800 cursor-pointer hover:border-charcoal-700 transition">
+            <label className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-navy-850 border border-slate-200 dark:border-white/[0.06] cursor-pointer hover:border-slate-300 dark:hover:border-white/20 transition">
               <input
                 type="checkbox"
                 checked={config.enable_frequency_check}
                 onChange={(e) =>
                   setConfig({ ...config, enable_frequency_check: e.target.checked })
                 }
-                className="rounded accent-emerald-500 h-4 w-4"
+                className="rounded accent-cyber-cyan h-4 w-4"
               />
-              <span className="text-xs font-mono text-charcoal-300">
-                Enable agent frequency velocity limits
+              <span className="text-xs font-mono text-slate-700 dark:text-navy-200">
+                Enforce transaction rate limits
               </span>
             </label>
           </div>
-        </div>
+        </GlassCard>
 
-        {/* Counterparty Lists: Blocklist & Trusted List */}
+        {/* Counterparty Lists */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Critical Blocklist */}
-          <div className="payguard-panel p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-charcoal-800 pb-3">
+          {/* Blocklist */}
+          <GlassCard className="p-6 space-y-4" variant="elevated">
+            <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-white/[0.08] pb-3">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-rose-400" />
-                <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-white">
+                <Users className="w-4 h-4 text-rose-400" />
+                <h2 className="text-sm font-bold uppercase tracking-wider font-mono text-slate-900 dark:text-white">
                   Critical Blocklist
-                </h3>
+                </h2>
               </div>
-              <span className="text-[11px] font-mono text-rose-400 bg-rose-950/60 px-2 py-0.5 rounded border border-rose-800/40">
-                HARD BLOCK
-              </span>
+              <StatusBadge status="BLOCK" size="xs" />
             </div>
 
-            <p className="text-xs text-charcoal-400">
-              Any transaction destined for these addresses is automatically aborted.
+            <p className="text-xs text-slate-500 dark:text-navy-400 font-sans">
+              Any transaction destined for these addresses is automatically aborted with signature withholding.
             </p>
 
             <div className="flex gap-2">
@@ -335,93 +332,99 @@ export const Policies: React.FC = () => {
                 placeholder="bad-actor.near"
                 value={newBlocked}
                 onChange={(e) => setNewBlocked(e.target.value)}
-                className="flex-1 bg-charcoal-950 border border-charcoal-750 rounded-lg px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-rose-500"
+                className="flex-1 bg-white dark:bg-navy-900 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-rose-500"
               />
-              <button
+              <GradientButton
                 type="button"
+                variant="danger"
+                size="sm"
                 onClick={addBlocked}
-                className="px-3 py-1.5 rounded-lg bg-rose-700 hover:bg-rose-600 text-white text-xs font-mono flex items-center gap-1"
+                leftIcon={<Plus className="w-3.5 h-3.5" />}
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>ADD</span>
-              </button>
+                ADD
+              </GradientButton>
             </div>
 
-            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-              {config.blocked_recipients.map((addr) => (
-                <div
-                  key={addr}
-                  className="flex items-center justify-between p-2 rounded bg-charcoal-850 border border-charcoal-750 text-xs font-mono text-charcoal-300"
-                >
-                  <span className="truncate max-w-[260px]">{addr}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeBlocked(addr)}
-                    className="text-charcoal-400 hover:text-rose-400 p-1 transition"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+            <div className="max-h-48 overflow-y-auto divide-y divide-slate-200/80 dark:divide-white/[0.05] rounded-xl border border-slate-200/80 dark:border-white/[0.08] bg-slate-50/60 dark:bg-navy-900/60 p-2">
+              {config.blocked_recipients.length === 0 ? (
+                <div className="text-center py-4 text-xs font-mono text-slate-400 dark:text-navy-500">
+                  No addresses currently blocked.
                 </div>
-              ))}
+              ) : (
+                config.blocked_recipients.map((addr) => (
+                  <div key={addr} className="flex items-center justify-between py-2 px-3 text-xs font-mono text-slate-800 dark:text-navy-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]">
+                    <span>{addr}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeBlocked(addr)}
+                      className="text-slate-400 hover:text-rose-500 dark:text-navy-500 dark:hover:text-rose-400 transition"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
-          </div>
+          </GlassCard>
 
-          {/* Verified Trusted List */}
-          <div className="payguard-panel p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-charcoal-800 pb-3">
+          {/* Trusted Counterparties */}
+          <GlassCard className="p-6 space-y-4" variant="elevated">
+            <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-white/[0.08] pb-3">
               <div className="flex items-center gap-2">
-                <Shield className="w-4 h-4 text-emerald-400" />
-                <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-white">
+                <Users className="w-4 h-4 text-emerald-400" />
+                <h2 className="text-sm font-bold uppercase tracking-wider font-mono text-slate-900 dark:text-white">
                   Verified Trusted List
-                </h3>
+                </h2>
               </div>
-              <span className="text-[11px] font-mono text-emerald-400 bg-forest-950 px-2 py-0.5 rounded border border-emerald-800/50">
-                LOW RISK
-              </span>
+              <StatusBadge status="ALLOW" size="xs" />
             </div>
 
-            <p className="text-xs text-charcoal-400">
-              Verified counterparties bypass unknown-counterparty warnings.
+            <p className="text-xs text-slate-500 dark:text-navy-400 font-sans">
+              Known, whitelisted recipient counterparties (treasury, verified oracles, official contracts).
             </p>
 
             <div className="flex gap-2">
               <input
                 type="text"
-                placeholder="treasury.near"
+                placeholder="treasury.payguard.near"
                 value={newTrusted}
                 onChange={(e) => setNewTrusted(e.target.value)}
-                className="flex-1 bg-charcoal-950 border border-charcoal-750 rounded-lg px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-emerald-500"
+                className="flex-1 bg-white dark:bg-navy-900 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
               />
-              <button
+              <GradientButton
                 type="button"
+                variant="success"
+                size="sm"
                 onClick={addTrusted}
-                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono flex items-center gap-1"
+                leftIcon={<Plus className="w-3.5 h-3.5" />}
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>ADD</span>
-              </button>
+                ADD
+              </GradientButton>
             </div>
 
-            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-              {config.trusted_recipients.map((addr) => (
-                <div
-                  key={addr}
-                  className="flex items-center justify-between p-2 rounded bg-charcoal-850 border border-charcoal-750 text-xs font-mono text-charcoal-300"
-                >
-                  <span className="truncate max-w-[260px]">{addr}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeTrusted(addr)}
-                    className="text-charcoal-400 hover:text-rose-400 p-1 transition"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+            <div className="max-h-48 overflow-y-auto divide-y divide-slate-200/80 dark:divide-white/[0.05] rounded-xl border border-slate-200/80 dark:border-white/[0.08] bg-slate-50/60 dark:bg-navy-900/60 p-2">
+              {config.trusted_recipients.length === 0 ? (
+                <div className="text-center py-4 text-xs font-mono text-slate-400 dark:text-navy-500">
+                  No addresses currently trusted.
                 </div>
-              ))}
+              ) : (
+                config.trusted_recipients.map((addr) => (
+                  <div key={addr} className="flex items-center justify-between py-2 px-3 text-xs font-mono text-slate-800 dark:text-navy-200 hover:bg-slate-100 dark:hover:bg-white/[0.02]">
+                    <span>{addr}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeTrusted(addr)}
+                      className="text-slate-400 hover:text-rose-500 dark:text-navy-500 dark:hover:text-rose-400 transition"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
-          </div>
+          </GlassCard>
         </div>
       </form>
-    </div>
+    </PageTransition>
   );
 };

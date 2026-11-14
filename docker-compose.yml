@@ -1,0 +1,78 @@
+# ==============================================================================
+# PAYGUARD — Production Docker Compose Orchestration
+# ==============================================================================
+# Multi-container production deployment for PAYGUARD:
+#   1. backend  - FastAPI ASGI application with SQLite persistence & LangGraph
+#   2. frontend - Production Nginx container serving Vite React bundle
+# ==============================================================================
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: payguard-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - DATABASE_PATH=/app/data/payguard.db
+      - CORS_ORIGINS=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:80", "http://localhost", "http://127.0.0.1"]
+      - NEAR_NETWORK=testnet
+      - NEAR_NODE_URL=https://rpc.testnet.near.org
+      - NEAR_CONTRACT_ID=payguard-vault.testnet
+      - LLM_PROVIDER=mock
+      - LLM_MODEL=gpt-4o-mini
+      - ENABLE_MULTI_AGENT=true
+      - INTENT_AGENT_ENABLED=true
+      - BEHAVIOURAL_AGENT_ENABLED=true
+      - SECURITY_INTEL_AGENT_ENABLED=true
+      - AUDIT_AGENT_ENABLED=true
+    volumes:
+      - payguard-data:/app/data
+    networks:
+      - payguard-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=/api
+        - VITE_WS_URL=/ws/events
+    container_name: payguard-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "5173:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - payguard-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  payguard-data:
+    name: payguard-sqlite-storage
+
+networks:
+  payguard-network:
+    name: payguard-bridge-net
+    driver: bridge
+

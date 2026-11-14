@@ -1,7 +1,20 @@
 import math
 import re
+import unicodedata
 from typing import Any, Dict, List, Optional, Tuple
 from app.schemas.transaction import TransactionRequest
+
+
+def clean_account_id(raw: Optional[str]) -> str:
+    """
+    Normalizes account identifier to lowercase NFKC and strips
+    hidden zero-width spaces, bidi overrides, and control characters.
+    """
+    if not raw:
+        return ""
+    norm = unicodedata.normalize("NFKC", str(raw))
+    stripped = "".join(ch for ch in norm if unicodedata.category(ch)[0] != "C")
+    return stripped.strip().lower()
 
 
 class ValidationResult:
@@ -36,13 +49,15 @@ class TransactionValidator:
             errors.append("Transaction amount must be strictly greater than 0.")
         elif tx.amount < 0.000001:
             errors.append("Transaction amount is below minimum precision threshold (0.000001 NEAR).")
+        elif tx.amount > 1_000_000_000:
+            errors.append("Transaction amount exceeds maximum allowable supply threshold (1,000,000,000 NEAR).")
 
         # 2. Currency check
         if not tx.currency or tx.currency.upper() != "NEAR":
             errors.append(f"Unsupported currency '{tx.currency}'. Phase 1 only supports 'NEAR'.")
 
         # 3. Sender checks
-        sender = (tx.sender or "").strip().lower()
+        sender = clean_account_id(tx.sender)
         if not sender:
             errors.append("Sender account identifier is required.")
         elif len(sender) < 2 or len(sender) > 64:
@@ -51,7 +66,7 @@ class TransactionValidator:
             errors.append(f"Sender account '{sender}' contains invalid characters for NEAR protocol.")
 
         # 4. Recipient checks
-        recipient = (tx.recipient or "").strip().lower()
+        recipient = clean_account_id(tx.recipient)
         if not recipient:
             errors.append("Recipient account identifier is required.")
         elif len(recipient) < 2 or len(recipient) > 64:
@@ -78,3 +93,4 @@ class TransactionValidator:
             errors=errors,
             normalized=normalized,
         )
+

@@ -16,3 +16,4 @@ async def get_security_metrics():
     blocked exploits, prevented drain volume, and recent alerts.
     """
     return security_service.get_metrics()
+

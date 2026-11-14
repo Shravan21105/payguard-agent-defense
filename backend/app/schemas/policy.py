@@ -85,3 +85,4 @@ class PolicyResponse(BaseModel):
     version: str = "1.0.0"
     updated_at: datetime
     config: PolicyConfig
+

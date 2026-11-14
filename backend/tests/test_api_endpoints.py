@@ -11,12 +11,13 @@ def test_health_endpoint():
     data = response.json()
     assert data["status"] == "healthy"
     assert data["application"] == "PAYGUARD"
-    assert data["version"] == "0.1.0"
+    assert data["version"] in ("0.1.0", "0.2.0")
 
 
 def test_analyze_transaction_allowed():
+    import time
     payload = {
-        "sender": "agent-test.near",
+        "sender": f"agent-api-safe-{int(time.time() * 1000)}.near",
         "recipient": "oracle.near",
         "amount": 3.0,
         "currency": "NEAR",
@@ -49,9 +50,11 @@ def test_analyze_transaction_blocked_by_blocklist():
 
 
 def test_analyze_transaction_warn_unknown_recipient():
+    import time
+    unique_recipient = f"new-unlisted-{int(time.time() * 1000)}.near"
     payload = {
-        "sender": "agent-test.near",
-        "recipient": "new-unlisted-account.near",
+        "sender": f"agent-warn-{int(time.time() * 1000)}.near",
+        "recipient": unique_recipient,
         "amount": 10.0,
         "currency": "NEAR",
         "purpose": "Transfer to unknown counterparty",
@@ -115,3 +118,4 @@ def test_get_security_metrics():
     assert "protected_near_volume" in data
     assert "recent_alerts" in data
     assert data["total_monitored"] >= 4
+

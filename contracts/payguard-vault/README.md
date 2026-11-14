@@ -38,3 +38,4 @@ Autonomous AI agents NEVER hold direct private keys to unconstrained vault funds
 
 - **Phase 1 (Current):** Interface specification, security invariants, simulated execution models.
 - **Phase 2 (Upcoming):** Rust `near-sdk` contract implementation, testnet deployment, multi-signature timelock.
+

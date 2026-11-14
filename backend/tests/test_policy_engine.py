@@ -251,3 +251,4 @@ def test_determinism_identical_inputs_produce_identical_outputs(engine: Decision
     assert result_1.requires_approval == result_2.requires_approval
     assert result_1.policy_checks == result_2.policy_checks
     assert result_1.reasons == result_2.reasons
+

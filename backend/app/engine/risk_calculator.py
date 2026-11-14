@@ -188,3 +188,4 @@ class RiskCalculator:
             factors=factors,
             breakdown=breakdown,
         )
+

@@ -1,98 +1,178 @@
-# PAYGUARD — Architecture & System Design
+# PAYGUARD — System Architecture Specification
+## Multi-Tier Defense Architecture, Autonomous Agent Telemetry & Cryptographic Verification
 
-**Tagline:** Intelligent Security Infrastructure for Autonomous AI Agents  
-**NEAR Hackathon 2026** — AI Security & Defense (SEC) / Agent Economy (AGT)
+**Project:** PAYGUARD — Autonomous Agent Financial Defense Layer  
+**Document Version:** 2.0.0 (Phase 9 Release)  
+**NEAR Hackathon 2026:** AI Security & Defense (SEC) | Agent Economy (AGT)
 
 ---
 
-## 1. System Overview
+## 1. Architectural Philosophy
 
-PAYGUARD acts as a deterministic defense middleware inserted between autonomous AI agents and blockchain execution layers.
+PAYGUARD is an intelligent, deterministic transaction authorization middleware situated between autonomous AI agents and blockchain networks (NEAR Protocol).
 
-### The Central Security Principle:
+### The Inviolable Core Principle:
 ```
 AI analyzes. The policy engine enforces. The smart contract protects.
 ```
 
-- **AI is Advisory:** AI machine learning models and heuristics analyze behavioral anomalies and compute explainable risk scores. An AI recommendation can NEVER override a hard policy BLOCK.
-- **The Policy Engine is Authoritative:** Enforces deterministic invariants (per-transaction limits, 24h rolling velocity limits, address blocklists/whitelists, duplicate transaction detection).
-- **The Smart Contract is Guardian:** On-chain vault holds funds and only releases tokens upon receipt of verified policy authorization.
+- **AI is strictly advisory:** Machine learning models, LLMs, and behavioral heuristics analyze natural language intent and compute anomaly indicators. An AI model **NEVER** holds on-chain execution keys and **CANNOT** override a deterministic policy `BLOCK`.
+- **The Policy Engine is authoritative:** Enforces deterministic invariants (per-transaction limits, 24-hour rolling velocity limits, address blocklists/whitelists, duplicate transaction sliding windows).
+- **The Smart Contract is guardian:** The on-chain vault safely holds funds in escrow and releases tokens only upon validating a cryptographic signature produced by the policy authority over an RFC-8785 canonical hash.
 
 ---
 
-## 2. High-Level Component Architecture
+## 2. End-to-End System Architecture
 
+```mermaid
+graph TD
+    subgraph AgentEcosystem ["Autonomous AI Agent Ecosystem"]
+        AgentA["Autonomous Agent (LangGraph / CrewAI / AutoGPT)"]
+        AgentB["DeFi Trading Bot / Liquidity Manager"]
+    end
+
+    subgraph DefenseLayer ["PAYGUARD Autonomous Defense Layer"]
+        subgraph Ingress ["API & WebSocket Ingress"]
+            FastAPIApp["FastAPI Ingress (Rate Limiter & Payload Guard)"]
+            WSManager["WebSocket Telemetry Hub (/ws/events)"]
+        end
+
+        subgraph MultiAgentEngine ["LangGraph Multi-Agent AI Intelligence"]
+            IntentAgent["Agent A: Semantic Intent Auditor (LLM Gateway)"]
+            BehaviorAgent["Agent B: Behavioral Anomaly Profiler (Isolation Forest)"]
+            ThreatAgent["Agent C: Threat Intelligence & Injection Scanner"]
+            AuditAgent["Agent D: Cryptographic Digest & Consensus Synthesizer"]
+        end
+
+        subgraph PolicySubsystem ["Deterministic Policy Engine"]
+            Validator["Transaction Syntax & Address Normalizer"]
+            Engine["Deterministic Policy Engine"]
+            Calculator["Dynamic Risk Calculator"]
+            Decision["Decision Synthesis (ALLOW / WARN / BLOCK)"]
+        end
+
+        subgraph CryptoSubsystem ["Cryptographic Authorization"]
+            Canonicalizer["RFC-8785 Canonical JSON Formatter"]
+            Signer["Ed25519 Policy Authority Signer"]
+        end
+
+        subgraph StorageSubsystem ["Persistent State Tier"]
+            SQLiteDB[("SQLite 3 Database (WAL Mode) payguard.db")]
+        end
+    end
+
+    subgraph BlockchainTier ["NEAR Protocol (Testnet)"]
+        NearRpc["Public NEAR JSON-RPC Gateway"]
+        VaultContract["payguard-vault.testnet Smart Contract"]
+    end
+
+    subgraph OperatorInterface ["Security Operations Center (SOC)"]
+        ReactDashboard["React 19 + TypeScript Cyber SaaS Dashboard"]
+    end
+
+    AgentA -->|POST /api/transactions/initiate| FastAPIApp
+    AgentB -->|POST /api/transactions/initiate| FastAPIApp
+    FastAPIApp --> Validator
+    Validator --> MultiAgentEngine
+    MultiAgentEngine --> Engine
+    Engine --> Calculator
+    Calculator --> Decision
+
+    Decision -->|ALLOW| Canonicalizer
+    Canonicalizer --> Signer
+    Signer -->|Ed25519 Signed Transaction| NearRpc
+    NearRpc --> VaultContract
+
+    Decision -->|WARN| NearRpc
+    NearRpc -->|Create Timelock Escrow| VaultContract
+
+    Decision -->|BLOCK| StorageSubsystem
+
+    FastAPIApp --> StorageSubsystem
+    FastAPIApp --> WSManager
+    WSManager -->|Live Event Streaming| ReactDashboard
+    ReactDashboard -->|Human Approvals / Config| FastAPIApp
 ```
-+--------------------------------------------------------------------------+
-|                        AUTONOMOUS AI AGENT LAYER                         |
-|  (Agent Frameworks: LangChain, CrewAI, AutoGPT, Custom NEAR Agents)      |
-+--------------------------------------------------------------------------+
-                                     │
-                     HTTP POST /api/transactions/analyze
-                                     ▼
-+--------------------------------------------------------------------------+
-|                       PAYGUARD SECURITY BACKEND                          |
-|                                                                          |
-|  1. TransactionValidator: Structural, schema & sanity checks             |
-|  2. PolicyEngine: Deterministic rule verification                        |
-|     ├── Per-TX spending limit                                            |
-|     ├── Daily rolling volume ceiling                                     |
-|     ├── Counterparty blocklist & trusted list verification               |
-|     ├── Duplicate transaction detection (120s window)                    |
-|     └── Frequency / velocity burst protection                            |
-|  3. RiskCalculator: Explainable risk scoring (0-100)                      |
-|  4. DecisionEngine: Synthesizes verdict (ALLOW / WARN / BLOCK)           |
-|  5. BehaviouralAnomalyDetector: Scikit-learn Isolation Forest telemetry   |
-|  6. Telemetry & WebSockets: Live event stream to security dashboard      |
-+--------------------------------------------------------------------------+
-                                     │
-           ALLOW                     │ WARN                     │ BLOCK
-             ▼                       ▼                          ▼
-+----------------------+   +-------------------+   +-----------------------+
-| Authorized Execution |   | Human-in-the-Loop |   | Immediate Intercept   |
-| (Simulated in Ph1,   |   | Review Queue      |   | (Funds safe in vault, |
-| NEAR Vault in Ph2)   |   | (Operator signoff)|   | exploit prevented)    |
-+----------------------+   +-------------------+   +-----------------------+
+
+---
+
+## 3. Subsystem Breakdown & Responsibilities
+
+### 3.1 Ingress & Security Middleware (`backend/app/main.py`)
+- **Payload Size Enforcement:** Rejects request payloads greater than 1,048,576 bytes (1 MB) with `HTTP 413`.
+- **IP Rate Limiting:** Sliding-window throttle allowing up to 180 requests/minute per client on evaluation endpoints (`HTTP 429`).
+- **Security Headers:** Injects `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and `Content-Security-Policy` across all responses.
+- **CORS Whitelisting:** Configured dynamically via environment variables (`CORS_ORIGINS`).
+
+### 3.2 LangGraph Multi-Agent Ensemble (`backend/app/agents/`)
+- **Agent A (Intent Auditing):** Parses declared natural language task intent and cross-checks against actual recipient and amount parameters to detect stealth redirects. Filters out prompt injection and role hijacking attempts.
+- **Agent B (Behavioral Profiling):** Evaluates transaction velocity, recipient novelty, and spending frequency using an in-memory Isolation Forest anomaly detection algorithm.
+- **Agent C (Threat Intelligence):** Intercepts interactions with known malicious addresses, blacklisted contracts, and adversarial prompt signatures.
+- **Agent D (Consensus Synthesizer):** Synthesizes findings across agents into explainable four-quadrant risk reports and generates cryptographic evidence digests.
+
+### 3.3 Deterministic Policy Engine (`backend/app/engine/`)
+- Pure algorithmic enforcement operating with zero external network dependencies.
+- Evaluates:
+  1. Maximum single transaction amount (e.g. 50.0 NEAR).
+  2. Cumulative rolling 24-hour spending limit (e.g. 200.0 NEAR).
+  3. Trusted ecosystem whitelists and malicious address blocklists.
+  4. 120-second sliding-window duplicate transaction detection.
+
+### 3.4 Cryptographic Authorization Engine (`backend/app/blockchain/`)
+- **RFC-8785 Canonical JSON Serialization:** Normalizes key ordering, whitespace, and numerical precision.
+- **SHA-256 Digest:** Produces immutable 32-byte hash of authorized transaction parameters.
+- **Ed25519 Native Signatures:** Signs the canonical digest using a dedicated authority private key. The resulting signature is passed on-chain.
+
+### 3.5 Persistent Storage Engine (`backend/app/db/`)
+- High-concurrency SQLite repository running in Write-Ahead Logging (`PRAGMA journal_mode = WAL`) mode with foreign key enforcement.
+- Thread-safe access guaranteed through Python's `threading.RLock`.
+- Manages 11 distinct schemas: `transactions`, `events`, `agent_executions`, `security_findings`, `authorization_evidence`, `policies`, etc.
+
+### 3.6 Smart Contract Vault (`contracts/payguard-vault`)
+- Implemented in Rust using NEAR SDK 5.5.0 (`cdylib` target).
+- Features:
+  - `authorize_and_transfer`: Verifies Ed25519 signature on-chain via host function `env::ed25519_verify`. Transfers funds directly if signature is valid and nonce has not been executed.
+  - `create_escrow`: Locks funds in contract for `WARN` decisions.
+  - `release_escrow` & `refund_escrow`: Human operator authorized fund release or refund.
+  - `pause` & `unpause`: Immediate circuit breaker for owner.
+
+---
+
+## 4. Transaction Lifecycle State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> RECEIVED: Agent initiates transfer
+
+    RECEIVED --> VALIDATING: Syntax & Normalization
+    VALIDATING --> REJECTED: Invalid Syntax (400)
+    
+    VALIDATING --> EVALUATING: AI Intelligence & Policy Checks
+    
+    EVALUATING --> BLOCKED: Hard Policy Violation (100 Risk)
+    BLOCKED --> [*]: Exploit Intercepted (Funds Safe)
+
+    EVALUATING --> WARN_ESCROW: Unverified Recipient / Medium Risk (30-69)
+    WARN_ESCROW --> PENDING_APPROVAL: Funds Locked in On-Chain Vault
+    PENDING_APPROVAL --> CONFIRMED: Operator Confirms (Release Vault)
+    PENDING_APPROVAL --> REFUNDED: Operator Rejects (Refund to Agent)
+
+    EVALUATING --> ALLOWED: Clean Policy Verification (0-29 Risk)
+    ALLOWED --> SIGNING: Ed25519 RFC-8785 Canonical Sign
+    SIGNING --> EXECUTING: Submit to NEAR Smart Contract
+    EXECUTING --> CONFIRMED: On-Chain Receipt Confirmed
+    CONFIRMED --> [*]: Complete
 ```
 
 ---
 
-## 3. Data Flow
+## 5. Telemetry & WebSocket Event Model
 
-1. **Agent Intent Submission:** Autonomous agent initiates a financial transaction request specifying sender, recipient, amount, currency, and declared task purpose.
-2. **Syntactic Validation:** `TransactionValidator` verifies NEAR address format, non-zero positive amounts, and data integrity.
-3. **Deterministic Policy Check:** `PolicyEngine` checks:
-   - Is recipient on the `blocked_recipients` list? -> Hard `BLOCKED`.
-   - Is transaction identical to another within `duplicate_window_seconds`? -> Hard `FAILED`.
-   - Does amount exceed `max_tx_amount`? -> Hard `FAILED`.
-   - Does projected 24h volume exceed `daily_spending_limit`? -> Hard `FAILED`.
-   - Does transaction velocity exceed `max_tx_frequency_per_minute`? -> Hard `FAILED`.
-   - Is recipient unknown? -> `WARNING` (triggers human-in-the-loop requirement).
-4. **Explainable Risk Scoring:** `RiskCalculator` computes an additive, explainable 0–100 score across threat categories.
-5. **Deterministic Decision Synthesis:** `DecisionEngine` assigns:
-   - `BLOCK`: Hard restriction violated or risk score >= `high_risk_threshold`.
-   - `WARN`: Requires human operator approval or risk score >= `medium_risk_threshold`.
-   - `ALLOW`: Passed all policies and risk score < `medium_risk_threshold`.
-6. **Broadcasting & Persistence:** Result recorded in security telemetry log and broadcast over WebSockets to the active React dashboard.
-
----
-
-## 4. Security Architecture & Threat Vectors Mitigated
-
-| Threat Vector | Mitigation Mechanism | Engine Component |
-| :--- | :--- | :--- |
-| **Malicious Address Drain** | Instant hard BLOCK on known exploiter/drainer accounts | `PolicyEngine` (Blocklist) |
-| **Excessive Spending** | Strict numerical ceilings per transaction and 24h window | `PolicyEngine` (Amount & Daily Limits) |
-| **Replay / Duplicate Attacks** | Deduplication hash checking within rolling time window | `PolicyEngine` (Duplicate Check) |
-| **Prompt Injection Manipulation** | Deterministic code boundaries; LLM cannot authorize funds | `DecisionEngine` Invariant |
-| **Flooding / Infinite Loops** | Transaction velocity rate-limiting per sender agent | `PolicyEngine` (Frequency Check) |
-| **Unverified Counterparties** | Human-in-the-loop mandatory review escalation | `DecisionEngine` (WARN Workflow) |
-
----
-
-## 5. Technology Stack
-
-- **Backend:** Python 3.11.9, FastAPI, Pydantic v2, Pydantic Settings, Uvicorn, WebSockets.
-- **AI / ML:** Scikit-learn (Isolation Forest baseline), explainable heuristic risk engines.
-- **Frontend:** React 19, TypeScript, Vite, Tailwind CSS, Recharts, Lucide React, Axios.
-- **Blockchain (Future Phases):** NEAR Protocol Testnet, Rust `near-sdk`, NEAR JavaScript SDK.
+The WebSocket broadcaster (`/ws/events`) streams lifecycle events in real time to connected dashboards:
+1. `transaction.received` — Initial transaction receipt.
+2. `transaction.analyzing` — AI and policy evaluations underway.
+3. `transaction.evaluated` — ALLOW, WARN, or BLOCK verdict synthesized.
+4. `security.threat_intercepted` — Malicious payload or address blocked.
+5. `escrow.created` — Vault escrow locked for human review.
+6. `escrow.released` / `escrow.refunded` — Operator action executed.
+7. `blockchain.receipt_confirmed` — Finalized on-chain block receipt.
