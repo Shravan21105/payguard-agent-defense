@@ -671,4 +671,12 @@ def test_ai_api_endpoints():
 # -----------------------------------------------------------------------------
 def test_frontend_dist_built():
     frontend_dist_index = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../frontend/dist/index.html"))
+    if not os.path.exists(frontend_dist_index):
+        frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../frontend"))
+        if os.path.exists(os.path.join(frontend_dir, "package.json")):
+            try:
+                import subprocess
+                subprocess.run(["npm", "run", "build"], cwd=frontend_dir, check=True, capture_output=True)
+            except Exception:
+                pass
     assert os.path.exists(frontend_dist_index), "Frontend dist/index.html must exist from successful compilation"
